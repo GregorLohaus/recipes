@@ -21,7 +21,7 @@ jobs:
         runs-on: ubuntu-24.04
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               id: checkout
               with:
                 fetch-depth: 0
@@ -114,7 +114,7 @@ jobs:
             - name: JSON files are valid
               if: "always() && steps.checkout.outcome == 'success'"
               run: |
-                ERRORS=$(find * -name '*.json' | xargs -n1 -P0 bash -c 'ERR=$(cd / && python -mjson.tool '$(pwd)'/"$0" 2>&1 1> /dev/null) || echo \\n::error file="$0",line=`echo "${ERR#*: line }" | cut -d" " -f 1`::${ERR%%: line *}')
+                ERRORS=$(find * -name '*.json' | xargs -r -n1 -P0 bash -c 'ERR=$(python -mjson.tool "$1" 2>&1 1> /dev/null) || echo \\n::error file="$1",line=`echo "${ERR#*: line }" | cut -d" " -f 1`::${ERR%%: line *}' _)
                 if [[ "" != "$ERRORS" ]]; then echo -e "$ERRORS\n"; exit 1; fi
             - name: YAML files are valid
               if: "always() && steps.checkout.outcome == 'success'"
@@ -147,6 +147,10 @@ jobs:
                     | cut -d: -f1-2 \
                     | sed 's/\(.*\):\([0-9]*\)$/\\n::error file=\1,line=\2::Symfony commands should not be wrapped in a Makefile/' || true)
                 if [[ "" != "$ERRORS" ]]; then echo -e "$ERRORS\n"; exit 1; fi
+            - name: Shellcheck
+              if: "always() && steps.checkout.outcome == 'success'"
+              run: |
+                find * -name '*.sh' -print0 | xargs -0 -r shellcheck -x -e SC1091 -e SC2086
     create-project:
         needs: run-checks
         name: Run updated recipes
